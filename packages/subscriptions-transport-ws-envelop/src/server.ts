@@ -4,8 +4,6 @@ import MessageTypes from './message-types';
 import { GRAPHQL_WS } from './protocol';
 import isObject from './utils/is-object';
 import {
-  parse as defaultParse,
-  validate as defaultValidate,
   ExecutionResult,
   GraphQLSchema,
   DocumentNode,
@@ -21,6 +19,8 @@ import { isASubscriptionOperation } from './utils/is-subscriptions';
 import { parseLegacyProtocolMessage } from './legacy/parse-legacy-protocol';
 import { IncomingMessage } from 'http';
 
+import type { validate as defaultValidate } from 'graphql';
+
 export type ExecutionIterator = AsyncIterator<ExecutionResult>;
 
 export interface ExecutionParams<TContext = any> {
@@ -31,11 +31,13 @@ export interface ExecutionParams<TContext = any> {
   formatResponse?: Function;
   formatError?: Function;
   callback?: Function;
-  schema?: GraphQLSchema;
+  schema: GraphQLSchema;
+  validate: typeof defaultValidate;
+  parse: ParseType;
 }
 
 export type ConnectionContext = {
-  initPromise?: Promise<any>;
+  initPromise?: Promise<OnConnectResult>;
   isLegacy: boolean;
   socket: WebSocket;
   request: IncomingMessage;
@@ -83,22 +85,31 @@ export type SubscribeFunction = (
   | AsyncIterator<ExecutionResult>
   | Promise<AsyncIterator<ExecutionResult> | ExecutionResult>;
 
+export type ParseType = (
+  source: string | Source,
+  options?: ParseOptions
+) => DocumentNode | Promise<DocumentNode>;
+
+export interface OnConnectResult {
+  contextValue: Record<string, any> | boolean | undefined | null;
+  parse: ParseType;
+  validate: typeof defaultValidate;
+  schema: GraphQLSchema;
+}
+
 export interface ServerOptions {
   rootValue?: any;
-  schema?: GraphQLSchema;
-  execute?: ExecuteFunction;
-  subscribe?: SubscribeFunction;
-  parse?: (
-    source: string | Source,
-    options?: ParseOptions
-  ) => DocumentNode | Promise<DocumentNode>;
-  validate?: typeof defaultValidate;
+  execute: ExecuteFunction;
+  subscribe: SubscribeFunction;
   validationRules?:
     | Array<(context: ValidationContext) => any>
     | ReadonlyArray<any>;
   onOperation?: Function;
   onOperationComplete?: Function;
-  onConnect?: Function;
+  onConnect: (
+    connectionParams: OperationMessage['payload'] | undefined,
+    connectionContext: ConnectionContext
+  ) => Promise<OnConnectResult>;
   onDisconnect?: Function;
   keepAlive?: number;
 }
@@ -108,13 +119,12 @@ const isWebSocketServer = (socket: any) => socket.on;
 export class SubscriptionServer {
   private onOperation: Function;
   private onOperationComplete: Function;
-  private onConnect: Function;
+  private onConnect: ServerOptions['onConnect'];
   private onDisconnect: Function;
 
   private wsServer: WebSocket.Server;
   private execute: ExecuteFunction;
   private subscribe: SubscribeFunction;
-  private schema: GraphQLSchema;
   private rootValue: any;
   private keepAlive: number;
   private closeHandler: () => void;
@@ -122,8 +132,8 @@ export class SubscriptionServer {
     | Array<(context: ValidationContext) => any>
     | ReadonlyArray<any>;
 
-  private parse: ServerOptions['parse'];
-  private validate: ServerOptions['validate'];
+  private parse: ParseType | null = null;
+  private validate: typeof defaultValidate | null = null;
 
   public static create(
     options: ServerOptions,
@@ -142,12 +152,7 @@ export class SubscriptionServer {
       onConnect,
       onDisconnect,
       keepAlive,
-      parse = defaultParse,
-      validate,
     } = options;
-
-    this.parse = parse;
-    this.validate = validate;
 
     this.specifiedRules = options.validationRules || specifiedRules;
     this.loadExecutor(options);
@@ -182,7 +187,7 @@ export class SubscriptionServer {
       }
 
       const connectionContext: ConnectionContext = Object.create(null);
-      connectionContext.initPromise = Promise.resolve(true);
+
       connectionContext.isLegacy = false;
       connectionContext.socket = socket;
       connectionContext.request = request;
@@ -230,7 +235,7 @@ export class SubscriptionServer {
   }
 
   private loadExecutor(options: ServerOptions) {
-    const { execute, subscribe, schema, rootValue } = options;
+    const { execute, subscribe, rootValue } = options;
 
     if (!execute) {
       throw new Error(
@@ -238,7 +243,6 @@ export class SubscriptionServer {
       );
     }
 
-    this.schema = schema;
     this.rootValue = rootValue;
     this.execute = execute;
     this.subscribe = subscribe;
@@ -286,26 +290,23 @@ export class SubscriptionServer {
       switch (parsedMessage.type) {
         case MessageTypes.GQL_CONNECTION_INIT:
           if (this.onConnect) {
-            connectionContext.initPromise = new Promise((resolve, reject) => {
-              try {
-                // TODO - this should become a function call with just 2 arguments in the future
-                // when we release the breaking change api: parsedMessage.payload and connectionContext
-                resolve(
-                  this.onConnect(
-                    parsedMessage.payload,
-                    connectionContext.socket,
-                    connectionContext
-                  )
-                );
-              } catch (e) {
-                reject(e);
+            connectionContext.initPromise = new Promise<OnConnectResult>(
+              (resolve, reject) => {
+                try {
+                  this.onConnect(parsedMessage.payload, connectionContext).then(
+                    resolve,
+                    reject
+                  );
+                } catch (e) {
+                  reject(e);
+                }
               }
-            });
+            );
           }
 
           connectionContext.initPromise
-            .then((result) => {
-              if (result === false) {
+            .then(({ contextValue }) => {
+              if (contextValue === false) {
                 throw new Error('Prohibited connection!');
               }
 
@@ -366,16 +367,20 @@ export class SubscriptionServer {
                 query: parsedMessage.payload.query,
                 variables: parsedMessage.payload.variables,
                 operationName: parsedMessage.payload.operationName,
-                context: isObject(initResult)
+                context: isObject(initResult.contextValue)
                   ? Object.assign(
-                      Object.create(Object.getPrototypeOf(initResult)),
-                      initResult
+                      Object.create(
+                        Object.getPrototypeOf(initResult.contextValue)
+                      ),
+                      initResult.contextValue
                     )
                   : {},
                 formatResponse: <any>undefined,
                 formatError: <any>undefined,
                 callback: <any>undefined,
-                schema: this.schema,
+                schema: initResult.schema,
+                parse: initResult.parse,
+                validate: initResult.validate,
               };
               let promisedParams = Promise.resolve(baseParams);
 
@@ -411,6 +416,9 @@ export class SubscriptionServer {
                     throw new Error(error);
                   }
 
+                  if (!this.parse || !this.validate)
+                    throw Error(`Connection not initialized correctly!`);
+
                   const document =
                     typeof baseParams.query !== 'string'
                       ? baseParams.query
@@ -429,8 +437,8 @@ export class SubscriptionServer {
                       errors: validationErrors,
                     });
                   } else {
-                    let executor: SubscribeFunction | ExecuteFunction = this
-                      .execute;
+                    let executor: SubscribeFunction | ExecuteFunction =
+                      this.execute;
                     if (
                       this.subscribe &&
                       isASubscriptionOperation(document, params.operationName)
