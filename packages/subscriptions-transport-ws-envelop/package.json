@@ -1,24 +1,37 @@
 {
   "name": "subscriptions-transport-ws-envelop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A websocket transport for GraphQL subscriptions",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/apollostack/subscriptions-transport-ws.git"
+    "url": "git+https://github.com/PabloSzx/subscriptions-transport-ws",
+    "directory": "packages/subscriptions-transport-ws-envelops"
   },
   "license": "MIT",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    },
+    "./*": {
+      "require": "./dist/*.js",
+      "import": "./dist/*.mjs"
+    }
+  },
   "main": "dist/index.js",
+  "module": "dist/index.mjs",
   "browser": "dist/client.js",
   "typings": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "browser-compile": "webpack --config \"./unpkg-webpack.config.js\"",
     "clean": "rimraf browser dist coverage",
-    "compile": "tsc",
     "coverage": "node ./node_modules/istanbul/lib/cli.js cover _mocha -- --exit --full-trace ./dist/test/tests.js",
     "postcoverage": "remap-istanbul --input coverage/coverage.raw.json --type lcovonly --output coverage/lcov.info",
     "lint": "tslint --format stylish --project ./tsconfig.json",
-    "prepublishOnly": "npm run clean && npm run compile && npm run browser-compile",
-    "pretest": "npm run compile",
+    "prepare": "bob-esbuild build",
     "test": "npm run testonly --",
     "posttest": "npm run lint",
     "testonly": "mocha --exit --reporter spec --full-trace ./dist/test/**/*.js",
@@ -29,23 +42,22 @@
     "backo2": "^1.0.2",
     "eventemitter3": "^3.1.2",
     "iterall": "^1.3.0",
-    "symbol-observable": "^1.2.0",
-    "ws": "^5.2.2"
+    "symbol-observable": "^1.2.0"
   },
   "devDependencies": {
-    "@types/chai": "^4.2.17",
-    "@types/is-promise": "^2.1.0",
-    "@types/lodash": "^4.14.168",
+    "@types/chai": "^4.2.18",
+    "@types/lodash": "^4.14.170",
     "@types/mocha": "^5.2.7",
     "@types/node": "^8.10.66",
     "@types/sinon": "^5.0.7",
     "@types/ws": "^5.1.2",
+    "bob-esbuild": "^0.1.26",
+    "bob-esbuild-cli": "^0.1.26",
     "chai": "^4.3.4",
     "graphql": "^15.5.0",
     "graphql-subscriptions": "^1.2.1",
     "istanbul": "^1.0.0-alpha.2",
     "lodash": "^4.17.21",
-    "mocha": "^5.2.0",
     "mock-socket-with-protocol": "^7.1.1",
     "remap-istanbul": "^0.11.1",
     "rimraf": "^2.7.1",
@@ -53,10 +65,15 @@
     "tslint": "^5.20.1",
     "typescript": "^3.9.9",
     "webpack": "^4.46.0",
-    "webpack-cli": "^4.6.0"
+    "webpack-cli": "^4.7.2",
+    "ws": "^7.5.0"
   },
   "peerDependencies": {
-    "graphql": ">=0.10.0"
+    "graphql": ">=0.10.0",
+    "ws": "^7.5.0"
+  },
+  "publishConfig": {
+    "directory": "dist"
   },
   "typescript": {
     "definition": "dist/index.d.ts"

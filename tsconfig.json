@@ -6,7 +6,7 @@
     "sourceMap": true,
     "inlineSources": true,
     "noImplicitAny": true,
-    "rootDir": "./src",
+    "rootDir": ".",
     "outDir": "./dist",
     "allowSyntheticDefaultImports": true,
     "removeComments": true,
