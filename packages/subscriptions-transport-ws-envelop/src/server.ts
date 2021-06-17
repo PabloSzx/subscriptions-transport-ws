@@ -19,7 +19,10 @@ import { isASubscriptionOperation } from './utils/is-subscriptions';
 import { parseLegacyProtocolMessage } from './legacy/parse-legacy-protocol';
 import { IncomingMessage } from 'http';
 
-import type { validate as defaultValidate } from 'graphql';
+import type {
+  validate as defaultValidate,
+  execute as defaultExecute,
+} from 'graphql';
 
 export type ExecutionIterator = AsyncIterator<ExecutionResult>;
 
@@ -59,19 +62,6 @@ export interface OperationMessage {
   type: string;
 }
 
-export type ExecuteFunction = (
-  schema: GraphQLSchema,
-  document: DocumentNode,
-  rootValue?: any,
-  contextValue?: any,
-  variableValues?: { [key: string]: any },
-  operationName?: string,
-  fieldResolver?: GraphQLFieldResolver<any, any>
-) =>
-  | ExecutionResult
-  | Promise<ExecutionResult>
-  | AsyncIterator<ExecutionResult>;
-
 export type SubscribeFunction = (
   schema: GraphQLSchema,
   document: DocumentNode,
@@ -99,7 +89,7 @@ export interface OnConnectResult {
 
 export interface ServerOptions {
   rootValue?: any;
-  execute: ExecuteFunction;
+  execute: typeof defaultExecute;
   subscribe: SubscribeFunction;
   validationRules?:
     | Array<(context: ValidationContext) => any>
@@ -123,7 +113,7 @@ export class SubscriptionServer {
   private onDisconnect: Function;
 
   private wsServer: WebSocket.Server;
-  private execute: ExecuteFunction;
+  private execute: typeof defaultExecute;
   private subscribe: SubscribeFunction;
   private rootValue: any;
   private keepAlive: number;
@@ -437,7 +427,7 @@ export class SubscriptionServer {
                       errors: validationErrors,
                     });
                   } else {
-                    let executor: SubscribeFunction | ExecuteFunction =
+                    let executor: SubscribeFunction | typeof defaultExecute =
                       this.execute;
                     if (
                       this.subscribe &&
