@@ -122,9 +122,6 @@ export class SubscriptionServer {
     | Array<(context: ValidationContext) => any>
     | ReadonlyArray<any>;
 
-  private parse: ParseType | null = null;
-  private validate: typeof defaultValidate | null = null;
-
   public static create(
     options: ServerOptions,
     socketOptionsOrServer: WebSocket.ServerOptions | WebSocket.Server
@@ -406,17 +403,14 @@ export class SubscriptionServer {
                     throw new Error(error);
                   }
 
-                  if (!this.parse || !this.validate)
-                    throw Error(`Connection not initialized correctly!`);
-
                   const document =
                     typeof baseParams.query !== 'string'
                       ? baseParams.query
-                      : await this.parse(baseParams.query);
+                      : await params.parse(baseParams.query);
                   let executionPromise: Promise<
                     AsyncIterator<ExecutionResult> | ExecutionResult
                   >;
-                  const validationErrors = this.validate(
+                  const validationErrors = params.validate(
                     params.schema,
                     document,
                     this.specifiedRules

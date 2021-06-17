@@ -1,6 +1,6 @@
 {
   "name": "subscriptions-transport-ws-envelop",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A websocket transport for GraphQL subscriptions",
   "repository": {
     "type": "git",
