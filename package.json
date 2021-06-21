@@ -1,0 +1,6 @@
+{
+  "name": "monorepo-subscriptions-transport",
+  "dependencies": {
+    "bob-esbuild": "^0.1.27"
+  }
+}
