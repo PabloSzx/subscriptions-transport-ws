@@ -1,4 +1,4 @@
-import * as WebSocket from 'ws';
+import WebSocket from 'ws';
 
 import MessageTypes from './message-types';
 import { GRAPHQL_WS } from './protocol';
