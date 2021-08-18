@@ -195,7 +195,9 @@ export class SubscriptionClient {
     }
   }
 
-  public request(request: OperationOptions): Observable<ExecutionResult> {
+  public request<TData = { [key: string]: any }>(
+    request: OperationOptions
+  ): Observable<ExecutionResult<TData>> {
     const getObserver = this.getObserver.bind(this);
     const executeOperation = this.executeOperation.bind(this);
     const unsubscribe = this.unsubscribe.bind(this);
