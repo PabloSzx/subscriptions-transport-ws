@@ -212,7 +212,7 @@ export class SubscriptionClient {
       },
       subscribe(
         observerOrNext:
-          | Observer<ExecutionResult>
+          | Observer<ExecutionResult<any>>
           | ((v: ExecutionResult) => void),
         onError?: (error: Error) => void,
         onComplete?: () => void

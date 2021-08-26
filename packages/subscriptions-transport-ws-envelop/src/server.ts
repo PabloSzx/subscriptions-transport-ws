@@ -1,28 +1,25 @@
-import WebSocket from 'ws';
-
-import MessageTypes from './message-types';
-import { GRAPHQL_WS } from './protocol';
-import isObject from './utils/is-object';
+import type {
+  execute as defaultExecute,
+  validate as defaultValidate,
+} from 'graphql';
 import {
+  DocumentNode,
   ExecutionResult,
   GraphQLSchema,
-  DocumentNode,
-  ValidationContext,
+  parse as defaultParse,
   specifiedRules,
-  GraphQLFieldResolver,
-  Source,
-  ParseOptions,
+  subscribe as defaultSubscribe,
+  ValidationContext,
 } from 'graphql';
-import { createEmptyIterable } from './utils/empty-iterable';
-import { createAsyncIterator, forAwaitEach, isAsyncIterable } from 'iterall';
-import { isASubscriptionOperation } from './utils/is-subscriptions';
-import { parseLegacyProtocolMessage } from './legacy/parse-legacy-protocol';
 import { IncomingMessage } from 'http';
-
-import type {
-  validate as defaultValidate,
-  execute as defaultExecute,
-} from 'graphql';
+import { createAsyncIterator, forAwaitEach, isAsyncIterable } from 'iterall';
+import WebSocket from 'ws';
+import { parseLegacyProtocolMessage } from './legacy/parse-legacy-protocol';
+import MessageTypes from './message-types';
+import { GRAPHQL_WS } from './protocol';
+import { createEmptyIterable } from './utils/empty-iterable';
+import isObject from './utils/is-object';
+import { isASubscriptionOperation } from './utils/is-subscriptions';
 
 export type ExecutionIterator = AsyncIterator<ExecutionResult>;
 
@@ -36,7 +33,7 @@ export interface ExecutionParams<TContext = any> {
   callback?: Function;
   schema: GraphQLSchema;
   validate: typeof defaultValidate;
-  parse: ParseType;
+  parse: typeof defaultParse;
 }
 
 export type ConnectionContext = {
@@ -62,27 +59,9 @@ export interface OperationMessage {
   type: string;
 }
 
-export type SubscribeFunction = (
-  schema: GraphQLSchema,
-  document: DocumentNode,
-  rootValue?: any,
-  contextValue?: any,
-  variableValues?: { [key: string]: any },
-  operationName?: string,
-  fieldResolver?: GraphQLFieldResolver<any, any>,
-  subscribeFieldResolver?: GraphQLFieldResolver<any, any>
-) =>
-  | AsyncIterator<ExecutionResult>
-  | Promise<AsyncIterator<ExecutionResult> | ExecutionResult>;
-
-export type ParseType = (
-  source: string | Source,
-  options?: ParseOptions
-) => DocumentNode | Promise<DocumentNode>;
-
 export interface OnConnectResult {
   contextValue: Record<string, any> | boolean | undefined | null;
-  parse: ParseType;
+  parse: typeof defaultParse;
   validate: typeof defaultValidate;
   schema: GraphQLSchema;
 }
@@ -90,7 +69,7 @@ export interface OnConnectResult {
 export interface ServerOptions {
   rootValue?: any;
   execute: typeof defaultExecute;
-  subscribe: SubscribeFunction;
+  subscribe: typeof defaultSubscribe;
   validationRules?:
     | Array<(context: ValidationContext) => any>
     | ReadonlyArray<any>;
@@ -114,7 +93,7 @@ export class SubscriptionServer {
 
   private wsServer: WebSocket.Server;
   private execute: typeof defaultExecute;
-  private subscribe: SubscribeFunction;
+  private subscribe: typeof defaultSubscribe;
   private rootValue: any;
   private keepAlive: number;
   private closeHandler: () => void;
@@ -421,23 +400,25 @@ export class SubscriptionServer {
                       errors: validationErrors,
                     });
                   } else {
-                    let executor: SubscribeFunction | typeof defaultExecute =
-                      this.execute;
+                    let executor:
+                      | typeof defaultSubscribe
+                      | typeof defaultExecute = this.execute;
                     if (
                       this.subscribe &&
                       isASubscriptionOperation(document, params.operationName)
                     ) {
                       executor = this.subscribe;
                     }
+
                     executionPromise = Promise.resolve(
-                      executor(
-                        params.schema,
+                      executor({
                         document,
-                        this.rootValue,
-                        params.context,
-                        params.variables,
-                        params.operationName
-                      )
+                        schema: params.schema,
+                        rootValue: this.rootValue,
+                        contextValue: params.context,
+                        variableValues: params.variables,
+                        operationName: params.operationName,
+                      })
                     );
                   }
 

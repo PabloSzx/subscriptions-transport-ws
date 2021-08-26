@@ -1,6 +1,11 @@
 {
   "name": "monorepo-subscriptions-transport",
   "dependencies": {
-    "bob-esbuild": "^0.1.27"
+    "bob-esbuild": "^1.2.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "graphql": "16.0.0-rc.1"
+    }
   }
 }
