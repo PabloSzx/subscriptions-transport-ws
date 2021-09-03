@@ -1,7 +1,14 @@
 {
   "name": "monorepo-subscriptions-transport",
+  "scripts": {
+    "test": "node scripts/test-esm.mjs"
+  },
   "dependencies": {
     "bob-esbuild": "^1.2.3"
+  },
+  "devDependencies": {
+    "chalk": "^4.1.2",
+    "globby": "^12.0.2"
   },
   "pnpm": {
     "overrides": {

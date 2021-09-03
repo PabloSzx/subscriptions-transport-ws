@@ -1,22 +1,19 @@
-import NativeWebSocket from 'isomorphic-ws';
-
 import Backoff from 'backo2';
-import {
-  default as EventEmitterType,
-  EventEmitter,
-  ListenerFn,
-} from 'eventemitter3';
-import isString from './utils/is-string';
-import isObject from './utils/is-object';
-import { ExecutionResult } from 'graphql/execution/execute';
-import { print } from 'graphql/language/printer';
-import { DocumentNode } from 'graphql/language/ast';
-import { getOperationAST } from 'graphql/utilities/getOperationAST';
+import type { ListenerFn } from 'eventemitter3';
+import EventEmitterType from 'eventemitter3';
+import { ExecutionResult } from 'graphql/execution/execute.js';
+import { DocumentNode } from 'graphql/language/ast.js';
+import { print } from 'graphql/language/printer.js';
+import { getOperationAST } from 'graphql/utilities/getOperationAST.js';
+import NativeWebSocket from 'isomorphic-ws';
 import $$observable from 'symbol-observable';
-
-import { GRAPHQL_WS } from './protocol';
 import { MIN_WS_TIMEOUT, WS_TIMEOUT } from './defaults';
 import MessageTypes from './message-types';
+import { GRAPHQL_WS } from './protocol';
+import isObject from './utils/is-object';
+import isString from './utils/is-string';
+
+const { EventEmitter } = EventEmitterType;
 
 export interface Observer<T> {
   next?: (value: T) => void;
